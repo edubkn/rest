@@ -7,18 +7,18 @@ public class ProductDto implements Serializable {
 
     private static final long serialVersionUID = 600600769251815643L;
 
-    private Long id;
+    private String id;
     private String ean;
     private String title;
     private String brand;
     private BigDecimal price;
     private Integer stock;
 
-    public Long getId() {
+    public String getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(String id) {
         this.id = id;
     }
 
