@@ -9,6 +9,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import org.springframework.stereotype.Service;
 
 /**
@@ -18,25 +19,55 @@ import org.springframework.stereotype.Service;
 public class ProductService {
 
     public List<ProductResponseDto> process(List<ProductDto> products) {
-        List<String> eans = products.stream()
-                .map(ProductDto::getEan)
+
+        List<ProductResponseDto> groupedList = aggregateProducts(products, ProductDto::getEan, ProductDto::getTitle);
+
+        groupByField(groupedList, ProductDto::getTitle, ProductDto::getTitle);
+        groupByField(groupedList, ProductDto::getBrand, ProductDto::getBrand);
+
+        return groupedList;
+    }
+
+    private void groupByField(List<ProductResponseDto> groupedList, Function<ProductDto, String> groupField,
+                              Function<ProductDto, String> orderField) {
+        List<ProductResponseDto> ungrouped = groupedList.stream()
+                .filter(p -> p.getItems().size() == 1)
+                .collect(toList());
+
+        if (!ungrouped.isEmpty()) {
+            groupedList.removeAll(ungrouped);
+
+            List<ProductResponseDto> ungroupedGrouped = aggregateProducts(ungrouped.stream()
+                                                                .flatMap(u -> u.getItems().stream())
+                                                                .collect(toList()),groupField, orderField);
+            groupedList.addAll(ungroupedGrouped);
+        }
+    }
+
+    private List<ProductResponseDto> aggregateProducts(List<ProductDto> products,
+                                                       Function<ProductDto, String> groupField,
+                                                       Function<ProductDto, String> orderField) {
+        List<String> descriptions = products.stream()
+                .map(groupField)
                 .collect(toList());
         Map<String, List<ProductDto>> productMap = new HashMap<>();
-        eans.forEach(ean -> productMap.put(ean, products.stream()
-                                                    .filter(p -> p.getEan().equals(ean))
-                                                    .collect(toList())));
+        descriptions.forEach(ean -> productMap.put(ean, products.stream()
+                .filter(p -> groupField.apply(p).equals(ean))
+                .collect(toList())));
 
         List<ProductResponseDto> responseList = new ArrayList<>();
         productMap.forEach((k, v) -> {
-            ProductResponseDto pResponse = new ProductResponseDto(getDescription(v), v);
+            ProductResponseDto pResponse = new ProductResponseDto(getDescription(v, orderField), v);
             responseList.add(pResponse);
         });
+
         return responseList;
     }
 
-    private String getDescription(List<ProductDto> v) {
-        v.sort(Comparator.comparing(ProductDto::getTitle));
-        String title = v.get(0).getTitle();
+
+    private String getDescription(List<ProductDto> v, Function<ProductDto, String> descField) {
+        v.sort(Comparator.comparing(descField));
+        String title = descField.apply(v.get(0));
         v.sort(productComparator());
         return title;
     }
